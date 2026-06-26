@@ -1,6 +1,6 @@
 /**
  * API Route: /api/weather
- * Pronóstico de 4 días + temperatura actual con OpenWeatherMap real
+ * Pronóstico de 4 días + temperatura más cercana a la hora actual con OpenWeatherMap
  * Recibe por query: ?city=santiago&today=2026-06-26
  */
 
@@ -21,22 +21,8 @@ function formatDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-interface OpenWeatherCurrent {
-  main: {
-    temp: number;
-    temp_min: number;
-    temp_max: number;
-    humidity: number;
-  };
-  weather: Array<{
-    description: string;
-    icon: string;
-  }>;
-  wind: {
-    speed: number;
-    deg: number;
-    gust?: number;
-  };
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
 
 interface OpenWeatherForecastItem {
@@ -91,6 +77,23 @@ function getNoonItems(list: OpenWeatherForecastItem[]): OpenWeatherForecastItem[
   return result;
 }
 
+// Buscar el item del forecast más cercano a la hora actual
+function getClosestToNow(list: OpenWeatherForecastItem[]): OpenWeatherForecastItem {
+  const now = new Date();
+  let best = list[0];
+  let bestDiff = Infinity;
+
+  for (const item of list) {
+    const itemDate = new Date(item.dt * 1000);
+    const diff = Math.abs(itemDate.getTime() - now.getTime());
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = item;
+    }
+  }
+  return best;
+}
+
 async function getRealWeather(city: string, todayStr: string): Promise<any> {
   if (!OPENWEATHER_API_KEY) {
     throw new Error("OPENWEATHER_API_KEY no está configurada");
@@ -105,18 +108,17 @@ async function getRealWeather(city: string, todayStr: string): Promise<any> {
 
   const { lat, lon, name, country } = geoData[0];
 
-  // 1. CURRENT weather (temp actual ahora mismo)
-  const currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&lang=es&appid=${OPENWEATHER_API_KEY}`;
-  const currentRes = await fetch(currentUrl);
-  if (!currentRes.ok) throw new Error(`Error current weather: ${currentRes.status}`);
-  const currentData: OpenWeatherCurrent = await currentRes.json();
-
-  // 2. FORECAST (5 days, every 3 hours)
+  // Forecast (5 days, every 3 hours) - incluye datos actuales y futuros
   const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&lang=es&appid=${OPENWEATHER_API_KEY}`;
   const forecastRes = await fetch(forecastUrl);
   if (!forecastRes.ok) throw new Error(`Error forecast: ${forecastRes.status}`);
   const forecastData: OpenWeatherForecastResponse = await forecastRes.json();
 
+  // Temperatura más cercana a la hora actual (desde el forecast)
+  const closestNow = getClosestToNow(forecastData.list);
+  const currentTime = new Date(closestNow.dt * 1000);
+
+  // Para los días del pronóstico, usar el mediodía
   const noonItems = getNoonItems(forecastData.list);
 
   // Parse today
@@ -167,23 +169,31 @@ async function getRealWeather(city: string, todayStr: string): Promise<any> {
       continue;
     }
 
-    // For TODAY, override temp with CURRENT real temp
+    // Para HOY, usar la temperatura más cercana a la hora actual, no el mediodía
     const isToday = i === 0;
-    const temp = isToday ? Math.round(currentData.main.temp) : Math.round(item.main.temp);
+    const temp = isToday ? Math.round(closestNow.main.temp) : Math.round(item.main.temp);
 
     forecast.push({
       date: targetStr,
       temp,
       tempMin: Math.round(item.main.temp_min),
       tempMax: Math.round(item.main.temp_max),
-      description: item.weather[0]?.description || "despejado",
-      humidity: item.main.humidity,
-      wind: Math.round(item.wind.speed),
-      windDeg: item.wind.deg || 0,
-      windGust: Math.round(item.wind.gust || item.wind.speed * 1.5),
-      windDirection: getWindDirection(item.wind.deg || 0),
-      icon: item.weather[0]?.icon || "01d",
+      description: isToday
+        ? (closestNow.weather[0]?.description || item.weather[0]?.description || "despejado")
+        : (item.weather[0]?.description || "despejado"),
+      humidity: isToday ? closestNow.main.humidity : item.main.humidity,
+      wind: Math.round(isToday ? closestNow.wind.speed : item.wind.speed),
+      windDeg: isToday ? (closestNow.wind.deg || 0) : (item.wind.deg || 0),
+      windGust: Math.round(isToday
+        ? (closestNow.wind.gust || closestNow.wind.speed * 1.5)
+        : (item.wind.gust || item.wind.speed * 1.5)),
+      windDirection: getWindDirection(isToday ? (closestNow.wind.deg || 0) : (item.wind.deg || 0)),
+      icon: isToday
+        ? (closestNow.weather[0]?.icon || item.weather[0]?.icon || "01d")
+        : (item.weather[0]?.icon || "01d"),
       isToday,
+      // Solo para hoy: agregar hora de la medición
+      measuredAt: isToday ? formatTime(currentTime) : undefined,
     });
   }
 
@@ -191,13 +201,14 @@ async function getRealWeather(city: string, todayStr: string): Promise<any> {
     city: name,
     country: country || "CL",
     source: "openweathermap",
-    currentTemp: Math.round(currentData.main.temp),
-    currentDescription: currentData.weather[0]?.description || "",
-    currentIcon: currentData.weather[0]?.icon || "01d",
-    currentHumidity: currentData.main.humidity,
-    currentWind: Math.round(currentData.wind.speed),
-    currentWindDeg: currentData.wind.deg || 0,
-    currentWindGust: Math.round(currentData.wind.gust || currentData.wind.speed * 1.5),
+    currentTemp: Math.round(closestNow.main.temp),
+    currentDescription: closestNow.weather[0]?.description || "",
+    currentIcon: closestNow.weather[0]?.icon || "01d",
+    currentHumidity: closestNow.main.humidity,
+    currentWind: Math.round(closestNow.wind.speed),
+    currentWindDeg: closestNow.wind.deg || 0,
+    currentWindGust: Math.round(closestNow.wind.gust || closestNow.wind.speed * 1.5),
+    measuredAt: formatTime(currentTime),
     forecast,
   };
 }
@@ -220,11 +231,10 @@ export async function GET(request: Request) {
     try {
       if (!OPENWEATHER_API_KEY) throw new Error("API key no configurada");
       const realData = await getRealWeather(city, today);
-      console.log(`🌤️ Clima REAL para: ${city} - temp actual: ${realData.currentTemp}°C`);
+      console.log(`🌤️ Clima REAL para: ${city} - temp actual: ${realData.currentTemp}°C a las ${realData.measuredAt}`);
       return NextResponse.json(realData);
     } catch (err: any) {
       console.warn(`⚠️ Fallback a demo: ${err.message}`);
-      // Fallback demo...
       const forecast = [];
       const [year, month, day] = today.split("-").map(Number);
       const baseDate = new Date(year, month - 1, day);
