@@ -1,6 +1,6 @@
 /**
  * API Route: /api/weather
- * Pronóstico de 3 días (ayer, hoy, mañana) con datos de viento detallados
+ * Pronóstico de 4 días (ayer, hoy, mañana, pasado mañana) con datos de viento detallados
  * Usa datos demo mejorados (no requiere API key)
  * Recibe por query: ?city=santiago
  * Retorna: { city, country, source, forecast: [{date, temp, tempMin, tempMax, description, humidity, wind, windDeg, windGust, windDirection, icon, isToday}] }
@@ -24,7 +24,8 @@ function getDemoForecast(city: string) {
     { desc: "lluvia ligera", icon: "10d" },
   ];
 
-  for (let i = -1; i <= 1; i++) {
+  // 4 días: ayer (-1), hoy (0), mañana (+1), pasado mañana (+2)
+  for (let i = -1; i <= 2; i++) {
     const date = new Date(today);
     date.setDate(date.getDate() + i);
     const dateStr = date.toISOString().split("T")[0];
