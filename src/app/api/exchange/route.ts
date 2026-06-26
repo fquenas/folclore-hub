@@ -1,6 +1,6 @@
 /**
  * API Route: /api/exchange
- * Consulta tipos de cambio usando api.exchangerate.fun (gratis, sin key)
+ * Consulta tipos de cambio usando api.frankfurter.dev (gratis, sin key, mantenida por ECB)
  * Recibe por query: ?from=EUR&to=USD&amount=100
  * Retorna: { result, rate, from, to, amount, date }
  */
@@ -34,9 +34,9 @@ export async function GET(request: Request) {
 
     console.log(`🔄 Consultando tasa: ${from.toUpperCase()} → ${to.toUpperCase()}, monto: ${amount}`);
 
-    // 3. Llamada a la API de divisas (gratis, sin key)
+    // 3. Llamada a la API de Frankfurter (gratis, sin key, ECB)
     const response = await fetch(
-      `https://api.exchangerate.fun/latest?base=${from.toUpperCase()}`,
+      `https://api.frankfurter.dev/v1/latest?from=${from.toUpperCase()}&to=${to.toUpperCase()}`,
       {
         method: "GET",
         headers: {
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     const rate = data.rates[to.toUpperCase()];
 
     if (!rate) {
-      console.error("❌ Moneda no encontrada:", to, "Rates disponibles:", Object.keys(data.rates).slice(0, 10));
+      console.error("❌ Moneda no encontrada:", to, "Rates disponibles:", Object.keys(data.rates || {}));
       return NextResponse.json(
         { error: `Moneda ${to} no soportada` },
         { status: 400 }
