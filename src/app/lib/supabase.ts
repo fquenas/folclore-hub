@@ -4,8 +4,9 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// URL correcta de Supabase (hardcodeada para producción)
+const supabaseUrl = "https://nzkmtklwbasukxdwzxyn.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56a210a2x3YmFzdWt4ZHd6eHluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE0NDEsImV4cCI6MjA5Nzk3NzQ0MX0.hWHas9LpyCnInyNxkxCW_C0m9vQARyX1JuR8PIu4M4k";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
