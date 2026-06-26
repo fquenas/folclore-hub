@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   DollarSign,
@@ -15,22 +16,22 @@ import {
   Navigation,
   Zap,
 } from "lucide-react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Legend,
-} from "recharts";
 
-/**
- * MÓDULO 1: Viáticos Internacionales 💸🌤️
- */
+const TemperatureChart = dynamic(
+  () => import("@/app/components/WeatherCharts").then((mod) => mod.TemperatureChart),
+  { 
+    ssr: false, 
+    loading: () => <div className="h-64 flex items-center justify-center text-gray-400">Cargando gráfico...</div> 
+  }
+);
+
+const WindChart = dynamic(
+  () => import("@/app/components/WeatherCharts").then((mod) => mod.WindChart),
+  { 
+    ssr: false, 
+    loading: () => <div className="h-64 flex items-center justify-center text-gray-400">Cargando gráfico...</div> 
+  }
+);
 
 interface ExchangeResult {
   result: number;
@@ -166,7 +167,6 @@ export default function ViaticosPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
-      {/* Header */}
       <header className="bg-emerald-800 text-white py-6 shadow-lg">
         <div className="max-w-6xl mx-auto px-4 flex items-center gap-4">
           <Link href="/" className="p-2 rounded-lg hover:bg-emerald-700 transition-colors">
@@ -183,7 +183,6 @@ export default function ViaticosPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Formulario */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-emerald-600" />
@@ -261,7 +260,6 @@ export default function ViaticosPage() {
           </form>
         </div>
 
-        {/* Loading */}
         {loading && (
           <div className="flex flex-col items-center gap-3 py-8">
             <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
@@ -269,7 +267,6 @@ export default function ViaticosPage() {
           </div>
         )}
 
-        {/* Error */}
         {result?.error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex flex-col items-center gap-3">
             <AlertTriangle className="w-8 h-8 text-red-500" />
@@ -284,12 +281,9 @@ export default function ViaticosPage() {
           </div>
         )}
 
-        {/* Resultados */}
         {result && !loading && (
           <div className="space-y-6">
-            {/* Grid de Divisas + Clima principal */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Resultado Divisas */}
               {result.exchange && (
                 <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-emerald-500">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -320,7 +314,6 @@ export default function ViaticosPage() {
                 </div>
               )}
 
-              {/* Clima Hoy */}
               {result.weather && result.weather.forecast && (
                 <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -361,93 +354,24 @@ export default function ViaticosPage() {
               )}
             </div>
 
-            {/* Gráfico de Temperatura */}
             {result.weather && result.weather.forecast && (
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <ThermometerSun className="w-5 h-5 text-orange-500" />
                   Pronóstico de Temperatura (3 días)
                 </h3>
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={result.weather.forecast}>
-                      <defs>
-                        <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(value, index) => formatDate(value, result.weather!.forecast[index].isToday)}
-                        stroke="#6b7280"
-                      />
-                      <YAxis stroke="#6b7280" unit="°C" />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #e5e7eb" }}
-                        formatter={(value: any) => [`${value}°C`, "Temperatura"]}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="temp"
-                        stroke="#f97316"
-                        strokeWidth={3}
-                        fillOpacity={1}
-                        fill="url(#colorTemp)"
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="tempMax"
-                        stroke="#ef4444"
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        fill="none"
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="tempMin"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        fill="none"
-                      />
-                      <Legend />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
+                <TemperatureChart forecast={result.weather.forecast} formatDate={formatDate} />
               </div>
             )}
 
-            {/* Reporte de Vientos */}
             {result.weather && result.weather.forecast && (
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <Wind className="w-5 h-5 text-blue-500" />
                   Reporte de Vientos (3 días)
                 </h3>
-                <div className="h-64 w-full mb-6">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={result.weather.forecast}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(value, index) => formatDate(value, result.weather!.forecast[index].isToday)}
-                        stroke="#6b7280"
-                      />
-                      <YAxis stroke="#6b7280" unit=" m/s" />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #e5e7eb" }}
-                      />
-                      <Legend />
-                      <Bar dataKey="wind" name="Viento promedio" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="windGust" name="Ráfagas máximas" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Tabla detallada de vientos */}
-                <div className="overflow-x-auto">
+                <WindChart forecast={result.weather.forecast} formatDate={formatDate} />
+                <div className="overflow-x-auto mt-6">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b">
@@ -503,7 +427,6 @@ export default function ViaticosPage() {
               </div>
             )}
 
-            {/* Tarjetas de 3 días */}
             {result.weather && result.weather.forecast && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {result.weather.forecast.map((day) => (
