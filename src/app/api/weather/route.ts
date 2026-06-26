@@ -15,7 +15,8 @@ function getWindDirection(deg: number): string {
 }
 
 function getDemoForecast(city: string) {
-  const today = new Date();
+  // Usar fecha actual del servidor
+  const now = new Date();
   const forecast = [];
   const descriptions = [
     { desc: "cielo despejado", icon: "01d" },
@@ -26,9 +27,13 @@ function getDemoForecast(city: string) {
 
   // 4 días: ayer (-1), hoy (0), mañana (+1), pasado mañana (+2)
   for (let i = -1; i <= 2; i++) {
-    const date = new Date(today);
+    const date = new Date(now);
     date.setDate(date.getDate() + i);
-    const dateStr = date.toISOString().split("T")[0];
+    // Formato YYYY-MM-DD usando fecha local
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     
     const seed = city.length + i * 7 + date.getDate();
     const baseTemp = 18 + (seed % 15);
@@ -76,14 +81,8 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log(`🌤️ Consultando clima para: ${city}`);
+    console.log(`🌤️ Consultando clima para: ${city} - Fecha servidor: ${new Date().toISOString()}`);
     return NextResponse.json(getDemoForecast(city));
 
   } catch (error: any) {
-    console.error("💥 Weather API error:", error);
-    return NextResponse.json(
-      { error: "No se pudo obtener el clima. Intente más tarde." },
-      { status: 500 }
-    );
-  }
-}
+    console.error("💥 Weather API error:",
