@@ -1,21 +1,28 @@
 /**
  * API Route: /api/exchange
- * Consulta tipos de cambio usando api.exchangerate.fun (gratis, sin key, soporta CLP/ARS/COP)
+ * Consulta tipos de cambio. Intenta API externa primero, fallback a datos locales.
  * Recibe por query: ?from=CLP&to=USD&amount=100000
- * Retorna: { result, rate, from, to, amount, date }
+ * Retorna: { result, rate, from, to, amount, date, source }
  */
 
 import { NextResponse } from "next/server";
 
+// Tasas de fallback (aproximadas, actualizar según necesidad)
+const FALLBACK_RATES: Record<string, Record<string, number>> = {
+  CLP: { USD: 0.0011, EUR: 0.0010, ARS: 1.05, BRL: 0.0063 },
+  USD: { CLP: 910, EUR: 0.92, ARS: 950, BRL: 5.1 },
+  EUR: { USD: 1.09, CLP: 990, ARS: 1035, BRL: 5.55 },
+  ARS: { USD: 0.00105, CLP: 0.95, EUR: 0.00097, BRL: 0.0054 },
+  BRL: { USD: 0.196, CLP: 158, EUR: 0.18, ARS: 185 },
+};
+
 export async function GET(request: Request) {
   try {
-    // 1. Extraer query params de la URL
     const { searchParams } = new URL(request.url);
-    const from = searchParams.get("from");
-    const to = searchParams.get("to");
+    const from = searchParams.get("from")?.toUpperCase();
+    const to = searchParams.get("to")?.toUpperCase();
     const amountParam = searchParams.get("amount");
 
-    // 2. Validar parámetros obligatorios
     if (!from || !to) {
       return NextResponse.json(
         { error: "Faltan parámetros: from, to" },
@@ -24,7 +31,6 @@ export async function GET(request: Request) {
     }
 
     const amount = amountParam ? parseFloat(amountParam) : 1;
-
     if (isNaN(amount) || amount <= 0) {
       return NextResponse.json(
         { error: "El monto debe ser un número mayor a 0" },
@@ -32,53 +38,58 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log(`🔄 Consultando tasa: ${from.toUpperCase()} → ${to.toUpperCase()}, monto: ${amount}`);
+    let rate: number | null = null;
+    let source = "";
 
-    // 3. Llamada a exchangerate.fun (gratis, sin key, soporta CLP/ARS/COP/etc)
-    const response = await fetch(
-      `https://api.exchangerate.fun/latest?base=${from.toUpperCase()}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+    // Intento 1: API externa exchangerate.fun
+    try {
+      const response = await fetch(
+        `https://api.exchangerate.fun/latest?base=${from}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.rates && data.rates[to]) {
+          rate = data.rates[to];
+          source = "exchangerate.fun";
+        }
       }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Error en API externa:", response.status, errorText);
-      throw new Error(`Error ${response.status} al consultar tasas de cambio`);
+    } catch (e) {
+      console.log("API externa falló, usando fallback...");
     }
 
-    const data = await response.json();
-    const rate = data.rates[to.toUpperCase()];
+    // Intento 2: Fallback local
+    if (!rate && FALLBACK_RATES[from] && FALLBACK_RATES[from][to]) {
+      rate = FALLBACK_RATES[from][to];
+      source = "fallback-local";
+    }
 
+    // Si no hay tasa, error
     if (!rate) {
-      console.error("❌ Moneda no encontrada:", to, "Rates disponibles:", Object.keys(data.rates || {}).slice(0, 10));
       return NextResponse.json(
-        { error: `Moneda ${to} no soportada por el servicio de cambio` },
+        { error: `No se pudo obtener tasa para ${from} → ${to}` },
         { status: 400 }
       );
     }
 
-    // 4. Calcular resultado
     const result = amount * rate;
 
-    console.log("✅ Tasa obtenida:", { from, to, rate, result });
-
-    // 5. Retornar respuesta exitosa
     return NextResponse.json({
       result: Number(result.toFixed(2)),
-      rate: Number(rate.toFixed(4)),
-      from: from.toUpperCase(),
-      to: to.toUpperCase(),
+      rate: Number(rate.toFixed(6)),
+      from,
+      to,
       amount,
-      date: data.date || new Date().toISOString().split("T")[0],
+      date: new Date().toISOString().split("T")[0],
+      source,
     });
 
   } catch (error: any) {
-    console.error("💥 Exchange API error:", error);
+    console.error("Exchange API error:", error);
     return NextResponse.json(
       { error: "No se pudo obtener la tasa de cambio. Intente más tarde." },
       { status: 500 }
