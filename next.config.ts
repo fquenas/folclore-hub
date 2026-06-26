@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export',
-  distDir: 'dist',
+  // Eliminamos output: 'export' para usar SSR en Netlify
+  // distDir: 'dist' también lo quitamos, usa .next por defecto
   images: {
     unoptimized: true,
   },
