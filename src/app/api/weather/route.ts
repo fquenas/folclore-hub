@@ -4,15 +4,17 @@
  * La API key se lee de variables de entorno (process.env.OPENWEATHER_API_KEY)
  * NUNCA se expone en el frontend
  *
- * Recibe: { city: string }
- * Retorna: { temp, description, humidity, wind, icon, recommendation }
+ * Recibe por query: ?city=santiago
+ * Retorna: { temp, description, humidity, wind, icon, recommendation, city, country }
  */
 
 import { NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
-    const { city } = await request.json();
+    // 1. Extraer query params de la URL (ahora es GET, no POST)
+    const { searchParams } = new URL(request.url);
+    const city = searchParams.get("city");
 
     if (!city) {
       return NextResponse.json(
@@ -25,7 +27,7 @@ export async function POST(request: Request) {
 
     if (!apiKey) {
       // Fallback: si no hay key, retornamos datos simulados para demo
-      // En producción, esto debería retornar error 500
+      console.log("⚠️ OPENWEATHER_API_KEY no configurada, usando datos de demo");
       return NextResponse.json({
         temp: 22,
         description: "cielo despejado",
@@ -34,11 +36,13 @@ export async function POST(request: Request) {
         icon: "01d",
         recommendation: "Ropa ligera, protector solar",
         city: city,
+        country: "CL",
         fallback: true,
         note: "Usando datos de demostración. Configure OPENWEATHER_API_KEY en .env.local para datos reales.",
       });
     }
 
+    // 2. Llamada a OpenWeatherMap
     const response = await fetch(
       `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(
         city
@@ -46,12 +50,14 @@ export async function POST(request: Request) {
     );
 
     if (!response.ok) {
-      throw new Error("Error al consultar el clima");
+      const errorText = await response.text();
+      console.error("❌ Error en API de clima:", response.status, errorText);
+      throw new Error(`Error ${response.status} al consultar el clima`);
     }
 
     const data = await response.json();
 
-    // Generar recomendación de vestimenta basada en temperatura
+    // 3. Generar recomendación de vestimenta basada en temperatura
     const temp = data.main.temp;
     let recommendation = "";
 
@@ -62,6 +68,8 @@ export async function POST(request: Request) {
     else if (temp < 25)
       recommendation = "👕 Ropa ligera, llevar una chaqueta por si acaso";
     else recommendation = "👕 Ropa muy ligera, protector solar, gorra";
+
+    console.log("✅ Clima obtenido:", { city: data.name, temp, description: data.weather[0].description });
 
     return NextResponse.json({
       temp: Math.round(temp),
@@ -74,7 +82,7 @@ export async function POST(request: Request) {
       country: data.sys.country,
     });
   } catch (error: any) {
-    console.error("Weather API error:", error);
+    console.error("💥 Weather API error:", error);
     return NextResponse.json(
       { error: "No se pudo obtener el clima. Intente más tarde." },
       { status: 500 }
