@@ -15,6 +15,7 @@ import {
   Wind,
   Navigation,
   Zap,
+  Clock,
 } from "lucide-react";
 
 const TemperatureChart = dynamic(
@@ -62,6 +63,14 @@ interface WeatherResult {
   country: string;
   source: string;
   note?: string;
+  currentTemp?: number;
+  currentDescription?: string;
+  currentIcon?: string;
+  currentHumidity?: number;
+  currentWind?: number;
+  currentWindDeg?: number;
+  currentWindGust?: number;
+  measuredAt?: string;
   forecast: ForecastDay[];
 }
 
@@ -106,11 +115,10 @@ export default function ViaticosPage() {
         exchangeError = err.error || `Error ${exchangeRes.status}`;
       }
 
-      // Enviar fecha actual desde el navegador para que el backend use la fecha correcta
       const today = new Date();
       const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const day = String(today.getDate()).padStart(2, "0");
       const todayStr = `${year}-${month}-${day}`;
 
       const weatherRes = await fetch(
@@ -170,6 +178,11 @@ export default function ViaticosPage() {
       "50d": "🌫️", "50n": "🌫️",
     };
     return iconMap[iconCode] || "🌡️";
+  };
+
+  // Hora actual del navegador para mostrar
+  const getCurrentTime = () => {
+    return new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   };
 
   return (
@@ -321,39 +334,57 @@ export default function ViaticosPage() {
                 </div>
               )}
 
-              {result.weather && result.weather.forecast && (
+              {result.weather && (
                 <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-orange-500">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                     <ThermometerSun className="w-5 h-5 text-orange-500" />
                     Clima en {result.weather.city} — Hoy
                   </h3>
-                  {result.weather.forecast
-                    .filter((day) => day.isToday)
-                    .map((day) => (
-                      <div key={day.date} className="space-y-3">
-                        <div className="flex items-center gap-4">
-                          <div className="text-5xl">{getWeatherIcon(day.icon)}</div>
-                          <div>
-                            <div className="text-5xl font-bold text-orange-600">{day.temp}°C</div>
-                            <div className="text-gray-600 capitalize">{day.description}</div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3 text-sm">
-                          <div className="bg-gray-50 rounded-lg p-3 text-center">
-                            <span className="text-gray-500 block">Humedad</span>
-                            <span className="font-semibold text-lg">{day.humidity}%</span>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-3 text-center">
-                            <span className="text-gray-500 block">Viento</span>
-                            <span className="font-semibold text-lg">{day.wind} m/s</span>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-3 text-center">
-                            <span className="text-gray-500 block">Máx/Mín</span>
-                            <span className="font-semibold text-lg">{day.tempMax}°/{day.tempMin}°</span>
-                          </div>
-                        </div>
+                  
+                  {/* TEMPERATURA ACTUAL (currentTemp) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-4">
+                      <div className="text-5xl">
+                        {getWeatherIcon(result.weather.currentIcon || result.weather.forecast?.find(d => d.isToday)?.icon || "01d")}
                       </div>
-                    ))}
+                      <div>
+                        <div className="text-5xl font-bold text-orange-600">
+                          {result.weather.currentTemp !== undefined ? result.weather.currentTemp : result.weather.forecast?.find(d => d.isToday)?.temp}°C
+                        </div>
+                        <div className="text-gray-600 capitalize">
+                          {result.weather.currentDescription || result.weather.forecast?.find(d => d.isToday)?.description || ""}
+                        </div>
+                        {result.weather.source === "openweathermap" && (
+                          <div className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3" />
+                            Medido a las {getCurrentTime()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div className="bg-gray-50 rounded-lg p-3 text-center">
+                        <span className="text-gray-500 block">Humedad</span>
+                        <span className="font-semibold text-lg">
+                          {result.weather.currentHumidity !== undefined ? result.weather.currentHumidity : result.weather.forecast?.find(d => d.isToday)?.humidity}%
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3 text-center">
+                        <span className="text-gray-500 block">Viento</span>
+                        <span className="font-semibold text-lg">
+                          {result.weather.currentWind !== undefined ? result.weather.currentWind : result.weather.forecast?.find(d => d.isToday)?.wind} m/s
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3 text-center">
+                        <span className="text-gray-500 block">Máx/Mín</span>
+                        <span className="font-semibold text-lg">
+                          {result.weather.forecast?.find(d => d.isToday)?.tempMax}°/{result.weather.forecast?.find(d => d.isToday)?.tempMin}°
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   {result.weather.note && (
                     <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-3">⚠️ {result.weather.note}</p>
                   )}
@@ -454,7 +485,9 @@ export default function ViaticosPage() {
                     <div className="flex items-center gap-3 mb-3">
                       <span className="text-4xl">{getWeatherIcon(day.icon)}</span>
                       <div>
-                        <div className="text-3xl font-bold text-gray-800">{day.temp}°C</div>
+                        <div className="text-3xl font-bold text-gray-800">
+                          {day.isToday && result.weather?.currentTemp !== undefined ? result.weather.currentTemp : day.temp}°C
+                        </div>
                         <div className="text-sm text-gray-500 capitalize">{day.description}</div>
                       </div>
                     </div>
