@@ -71,46 +71,59 @@ export default function ViaticosPage() {
     setResult(null);
 
     try {
-      // Llamada 1: Conversión de divisas
-      const exchangeRes = await fetch("/api/exchange", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: fromCurrency,
-          to: toCurrency,
-          amount: parseFloat(amount),
-        }),
-      });
+      // ============================================
+      // ✅ LLAMADA 1: Conversión de divisas (GET)
+      // ============================================
+      const exchangeRes = await fetch(
+        `/api/exchange?from=${encodeURIComponent(fromCurrency)}&to=${encodeURIComponent(toCurrency)}&amount=${encodeURIComponent(amount)}`,
+        { method: "GET" }
+      );
 
-      const exchangeData = exchangeRes.ok
-        ? await exchangeRes.json()
-        : null;
-      const exchangeError = !exchangeRes.ok
-        ? (await exchangeRes.json()).error
-        : null;
+      let exchangeData = null;
+      let exchangeError = null;
 
-      // Llamada 2: Clima del destino
-      const weatherRes = await fetch("/api/weather", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city }),
-      });
+      if (exchangeRes.ok) {
+        exchangeData = await exchangeRes.json();
+        if (exchangeData.error) {
+          exchangeError = exchangeData.error;
+          exchangeData = null;
+        }
+      } else {
+        const err = await exchangeRes.json().catch(() => ({ error: "Error desconocido" }));
+        exchangeError = err.error || `Error ${exchangeRes.status}`;
+      }
 
-      const weatherData = weatherRes.ok
-        ? await weatherRes.json()
-        : null;
-      const weatherError = !weatherRes.ok
-        ? (await weatherRes.json()).error
-        : null;
+      // ============================================
+      // ✅ LLAMADA 2: Clima del destino (GET)
+      // ============================================
+      const weatherRes = await fetch(
+        `/api/weather?city=${encodeURIComponent(city)}`,
+        { method: "GET" }
+      );
+
+      let weatherData = null;
+      let weatherError = null;
+
+      if (weatherRes.ok) {
+        weatherData = await weatherRes.json();
+        if (weatherData.error) {
+          weatherError = weatherData.error;
+          weatherData = null;
+        }
+      } else {
+        const err = await weatherRes.json().catch(() => ({ error: "Error desconocido" }));
+        weatherError = err.error || `Error ${weatherRes.status}`;
+      }
 
       const globalError = exchangeError || weatherError || null;
 
       setResult({
-        exchange: exchangeData?.error ? null : exchangeData,
-        weather: weatherData?.error ? null : weatherData,
+        exchange: exchangeData,
+        weather: weatherData,
         error: globalError,
       });
     } catch (err: any) {
+      console.error("Error en Viaticos:", err);
       setResult({
         exchange: null,
         weather: null,
