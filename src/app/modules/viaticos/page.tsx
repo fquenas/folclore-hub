@@ -106,8 +106,15 @@ export default function ViaticosPage() {
         exchangeError = err.error || `Error ${exchangeRes.status}`;
       }
 
+      // Enviar fecha actual desde el navegador para que el backend use la fecha correcta
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
       const weatherRes = await fetch(
-        `/api/weather?city=${encodeURIComponent(city)}`,
+        `/api/weather?city=${encodeURIComponent(city)}&today=${todayStr}`,
         { method: "GET" }
       );
 
@@ -146,7 +153,7 @@ export default function ViaticosPage() {
 
   const formatDate = (dateStr: string, isToday: boolean) => {
     if (isToday) return "Hoy";
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + "T00:00:00");
     return date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
   };
 
@@ -358,7 +365,7 @@ export default function ViaticosPage() {
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <ThermometerSun className="w-5 h-5 text-orange-500" />
-                  Pronóstico de Temperatura (3 días)
+                  Pronóstico de Temperatura (4 días)
                 </h3>
                 <TemperatureChart forecast={result.weather.forecast} formatDate={formatDate} />
               </div>
@@ -368,7 +375,7 @@ export default function ViaticosPage() {
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <Wind className="w-5 h-5 text-blue-500" />
-                  Reporte de Vientos (3 días)
+                  Reporte de Vientos (4 días)
                 </h3>
                 <WindChart forecast={result.weather.forecast} formatDate={formatDate} />
                 <div className="overflow-x-auto mt-6">
@@ -428,7 +435,7 @@ export default function ViaticosPage() {
             )}
 
             {result.weather && result.weather.forecast && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {result.weather.forecast.map((day) => (
                   <div
                     key={day.date}

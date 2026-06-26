@@ -2,7 +2,7 @@
  * API Route: /api/weather
  * Pronóstico de 4 días (ayer, hoy, mañana, pasado mañana) con datos de viento detallados
  * Usa datos demo mejorados (no requiere API key)
- * Recibe por query: ?city=santiago
+ * Recibe por query: ?city=santiago&today=2026-06-26
  * Retorna: { city, country, source, forecast: [{date, temp, tempMin, tempMax, description, humidity, wind, windDeg, windGust, windDirection, icon, isToday}] }
  */
 
@@ -14,17 +14,7 @@ function getWindDirection(deg: number): string {
   return directions[index];
 }
 
-function getChileDate(): Date {
-  // Forzar zona horaria de Chile (UTC-4 o UTC-3 según DST)
-  const now = new Date();
-  const chileOffset = -4; // Chile está en UTC-4 (hora estándar)
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utc + (3600000 * chileOffset));
-}
-
-function getDemoForecast(city: string) {
-  // Usar fecha de Chile
-  const now = getChileDate();
+function getDemoForecast(city: string, todayStr: string) {
   const forecast = [];
   const descriptions = [
     { desc: "cielo despejado", icon: "01d" },
@@ -33,15 +23,19 @@ function getDemoForecast(city: string) {
     { desc: "lluvia ligera", icon: "10d" },
   ];
 
+  // Parsear la fecha recibida del frontend (YYYY-MM-DD)
+  const [year, month, day] = todayStr.split('-').map(Number);
+  const baseDate = new Date(year, month - 1, day);
+
   // 4 días: ayer (-1), hoy (0), mañana (+1), pasado mañana (+2)
   for (let i = -1; i <= 2; i++) {
-    const date = new Date(now);
+    const date = new Date(baseDate);
     date.setDate(date.getDate() + i);
-    // Formato YYYY-MM-DD usando fecha local de Chile
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
+    // Formato YYYY-MM-DD
+    const dateYear = date.getFullYear();
+    const dateMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const dateDay = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${dateYear}-${dateMonth}-${dateDay}`;
     
     const seed = city.length + i * 7 + date.getDate();
     const baseTemp = 18 + (seed % 15);
@@ -81,6 +75,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const city = searchParams.get("city");
+    const todayStr = searchParams.get("today");
 
     if (!city) {
       return NextResponse.json(
@@ -89,9 +84,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const chileDate = getChileDate();
-    console.log(`🌤️ Consultando clima para: ${city} - Fecha Chile: ${chileDate.toISOString()}`);
-    return NextResponse.json(getDemoForecast(city));
+    // Si no viene fecha del frontend, usar fecha del servidor como fallback
+    const today = todayStr || new Date().toISOString().split('T')[0];
+
+    console.log(`🌤️ Consultando clima para: ${city} - Fecha base: ${today}`);
+    return NextResponse.json(getDemoForecast(city, today));
 
   } catch (error: any) {
     console.error("💥 Weather API error:", error);
