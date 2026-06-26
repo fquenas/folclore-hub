@@ -14,9 +14,17 @@ function getWindDirection(deg: number): string {
   return directions[index];
 }
 
-function getDemoForecast(city: string) {
-  // Usar fecha actual del servidor
+function getChileDate(): Date {
+  // Forzar zona horaria de Chile (UTC-4 o UTC-3 según DST)
   const now = new Date();
+  const chileOffset = -4; // Chile está en UTC-4 (hora estándar)
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc + (3600000 * chileOffset));
+}
+
+function getDemoForecast(city: string) {
+  // Usar fecha de Chile
+  const now = getChileDate();
   const forecast = [];
   const descriptions = [
     { desc: "cielo despejado", icon: "01d" },
@@ -29,7 +37,7 @@ function getDemoForecast(city: string) {
   for (let i = -1; i <= 2; i++) {
     const date = new Date(now);
     date.setDate(date.getDate() + i);
-    // Formato YYYY-MM-DD usando fecha local
+    // Formato YYYY-MM-DD usando fecha local de Chile
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -81,8 +89,15 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log(`🌤️ Consultando clima para: ${city} - Fecha servidor: ${new Date().toISOString()}`);
+    const chileDate = getChileDate();
+    console.log(`🌤️ Consultando clima para: ${city} - Fecha Chile: ${chileDate.toISOString()}`);
     return NextResponse.json(getDemoForecast(city));
 
   } catch (error: any) {
-    console.error("💥 Weather API error:",
+    console.error("💥 Weather API error:", error);
+    return NextResponse.json(
+      { error: "No se pudo obtener el clima. Intente más tarde." },
+      { status: 500 }
+    );
+  }
+}
